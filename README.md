@@ -1,6 +1,6 @@
-# A Guide to Vertex AI Generative AI Ops on Airflow
+# MLOps for Gen AI on Airflow
 
-This guide moves through the different steps of an GenOps pipeline on Airflow, and provides sample DAGs for entire pipelines and other use-cases.
+This guide moves through the different steps of an MLOps for Gen AI pipeline on Airflow, and provides sample DAGs for entire pipelines and other use-cases.
 
 ## Getting Started
 
