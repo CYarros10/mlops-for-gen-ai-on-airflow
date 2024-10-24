@@ -4,11 +4,11 @@ This guide moves through the different steps of an GenOps pipeline on Airflow, a
 
 ## Getting Started
 
-What is GenOps?
+What is MLOps for Gen AI?
 
-GenOps, or generative AI operations, refers to the practices and processes involved in managing and operating generative models. Generative Models are artificial intelligence models trained on vast datasets of text and code, enabling them to perform various language-related tasks, such as text generation, translation, and question answering.
+MLOps for Gen AI, or generative AI operations, refers to the practices and processes involved in managing and operating generative models. Generative Models are artificial intelligence models trained on vast datasets of text and code, enabling them to perform various language-related tasks, such as text generation, translation, and question answering.
 
-GenOps involves a comprehensive set of activities, including:
+MLOps for Gen AI involves a comprehensive set of activities, including:
 
 - Model deployment and maintenance: deploying and managing generative models on cloud platforms or on-premises infrastructure
 - Data management: curating and preparing training data, as well as monitoring and maintaining data quality
@@ -16,7 +16,7 @@ GenOps involves a comprehensive set of activities, including:
 - Monitoring and evaluation: tracking generative model performance, identifying errors, and optimizing models
 - Security and compliance: ensuring the security and regulatory compliance of generative model operations
 
-GenOps involves a number of different steps, including:
+MLOps for Gen AI involves a number of different steps, including:
 
 - Data collection and preparation: generative models require large amounts of data to train. This data must be collected and prepared in a way that is suitable for training the model.
 - Model development: generative models are developed using a variety of techniques, including unsupervised learning, supervised learning, and reinforcement learning.
@@ -127,9 +127,9 @@ Airflow provides [RunEvaluationOperator](https://github.com/apache/airflow/blob/
 
 [source code](src/4_run_evaluations_dag.py)
 
-## 5. GenOps Pipelines
+## 5. MLOps for Gen AI Pipelines
 
-Now, we'll put it all together. A sample GenOps pipeline could wait for training data to arrive. Once training data arrives, begin the model tuning process, then evaluate the new model. We could optionally validate the evaluation metrics before moving forward. Or otherwise, ensure our prompt remains within budget and then send requests to our newly trained model.
+Now, we'll put it all together. A sample MLOps for Gen AI pipeline could wait for training data to arrive. Once training data arrives, begin the model tuning process, then evaluate the new model. We could optionally validate the evaluation metrics before moving forward. Or otherwise, ensure our prompt remains within budget and then send requests to our newly trained model.
 
 **Sample DAG graph:**
 
