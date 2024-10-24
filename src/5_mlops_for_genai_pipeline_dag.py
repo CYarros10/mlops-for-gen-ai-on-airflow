@@ -1,5 +1,5 @@
 """
-Example Airflow DAG for Google Vertex AI GenOps.
+Example Airflow DAG of MLOps for Gen AI.
 """
 
 from uuid import uuid4
