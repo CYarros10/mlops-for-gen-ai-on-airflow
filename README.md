@@ -135,7 +135,7 @@ Now, we'll put it all together. A sample MLOps for Gen AI pipeline could wait fo
 
 ![evaluation_image](images/genops_pipeline.png)
 
-[source code](src/5_genops_pipeline_dag.py)
+[source code](src/5_mlops_for_genai_pipeline_dag.py.py)
 
 ## 6. Comparing Models
 
