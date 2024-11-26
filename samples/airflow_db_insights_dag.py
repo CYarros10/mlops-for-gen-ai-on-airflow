@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 from vertexai.generative_models import Part
 from airflow import models
+from airflow.utils.task_group import TaskGroup
 from airflow.providers.google.cloud.transfers.postgres_to_gcs import PostgresToGCSOperator
 from airflow.providers.google.cloud.sensors.gcs import GCSObjectsWithPrefixExistenceSensor
 from airflow.providers.google.cloud.operators.vertex_ai.generative_model import GenerativeModelGenerateContentOperator
@@ -227,119 +228,119 @@ QUERIES = {
         ORDER BY n_live_tup DESC;
     """,
 
-    "zombie_tasks": f"""
-        WITH long_running AS (
-            SELECT 
-                ti.dag_id,
-                ti.task_id,
-                ti.start_date,
-                ti.state,
-                ti.hostname,
-                ti.operator,
-                EXTRACT(EPOCH FROM (NOW() - ti.start_date))/3600 as running_hours,
-                AVG(EXTRACT(EPOCH FROM (th.end_date - th.start_date)))/3600 as avg_historical_hours
-            FROM task_instance ti
-            LEFT JOIN task_instance_history th ON 
-                ti.dag_id = th.dag_id 
-                AND ti.task_id = th.task_id
-                AND th.state = 'success'
-            WHERE ti.state = 'running'
-                AND ti.start_date < NOW() - INTERVAL '1 hour'
-            GROUP BY ti.dag_id, ti.task_id, ti.start_date, ti.state, ti.hostname, ti.operator
-        )
-        SELECT 
-            dag_id,
-            task_id,
-            operator,
-            start_date,
-            hostname,
-            ROUND(running_hours::numeric, 2) as running_hours,
-            ROUND(avg_historical_hours::numeric, 2) as avg_historical_hours,
-            CASE 
-                WHEN running_hours > COALESCE(avg_historical_hours * 3, 24) THEN 'CRITICAL'
-                WHEN running_hours > COALESCE(avg_historical_hours * 2, 12) THEN 'WARNING'
-                ELSE 'MONITOR'
-            END as status
-        FROM long_running
-        WHERE running_hours > 1
-        ORDER BY running_hours DESC
-        LIMIT 100;
-    """,
+    # "zombie_tasks": f"""
+    #     WITH long_running AS (
+    #         SELECT 
+    #             ti.dag_id,
+    #             ti.task_id,
+    #             ti.start_date,
+    #             ti.state,
+    #             ti.hostname,
+    #             ti.operator,
+    #             EXTRACT(EPOCH FROM (NOW() - ti.start_date))/3600 as running_hours,
+    #             AVG(EXTRACT(EPOCH FROM (th.end_date - th.start_date)))/3600 as avg_historical_hours
+    #         FROM task_instance ti
+    #         LEFT JOIN task_instance_history th ON 
+    #             ti.dag_id = th.dag_id 
+    #             AND ti.task_id = th.task_id
+    #             AND th.state = 'success'
+    #         WHERE ti.state = 'running'
+    #             AND ti.start_date < NOW() - INTERVAL '1 hour'
+    #         GROUP BY ti.dag_id, ti.task_id, ti.start_date, ti.state, ti.hostname, ti.operator
+    #     )
+    #     SELECT 
+    #         dag_id,
+    #         task_id,
+    #         operator,
+    #         start_date,
+    #         hostname,
+    #         ROUND(running_hours::numeric, 2) as running_hours,
+    #         ROUND(avg_historical_hours::numeric, 2) as avg_historical_hours,
+    #         CASE 
+    #             WHEN running_hours > COALESCE(avg_historical_hours * 3, 24) THEN 'CRITICAL'
+    #             WHEN running_hours > COALESCE(avg_historical_hours * 2, 12) THEN 'WARNING'
+    #             ELSE 'MONITOR'
+    #         END as status
+    #     FROM long_running
+    #     WHERE running_hours > 1
+    #     ORDER BY running_hours DESC
+    #     LIMIT 100;
+    # """,
 
-    "dag_dependencies": f"""
-        WITH RECURSIVE dag_deps AS (
-            SELECT DISTINCT
-                dag_id as source_dag_id,
-                regexp_replace(task_id, '^external_task_sensor_', '') as target_dag_id,
-                1 as depth
-            FROM task_instance
-            WHERE task_id LIKE 'external_task_sensor_%'
-                AND start_date >= CURRENT_DATE - INTERVAL '{LOOKBACK_DAYS} day'
+    # "dag_dependencies": f"""
+    #     WITH RECURSIVE dag_deps AS (
+    #         SELECT DISTINCT
+    #             dag_id as source_dag_id,
+    #             regexp_replace(task_id, '^external_task_sensor_', '') as target_dag_id,
+    #             1 as depth
+    #         FROM task_instance
+    #         WHERE task_id LIKE 'external_task_sensor_%'
+    #             AND start_date >= CURRENT_DATE - INTERVAL '{LOOKBACK_DAYS} day'
             
-            UNION
+    #         UNION
             
-            SELECT 
-                d.source_dag_id,
-                regexp_replace(ti.task_id, '^external_task_sensor_', '') as target_dag_id,
-                d.depth + 1
-            FROM dag_deps d
-            JOIN task_instance ti ON d.target_dag_id = ti.dag_id
-            WHERE d.depth < 3
-                AND ti.task_id LIKE 'external_task_sensor_%'
-        )
-        SELECT 
-            dd.source_dag_id,
-            dd.target_dag_id,
-            dd.depth,
-            d1.is_paused as source_paused,
-            d2.is_paused as target_paused,
-            EXISTS (
-                SELECT 1 FROM task_instance 
-                WHERE dag_id = dd.source_dag_id 
-                AND state = 'failed'
-                AND start_date >= CURRENT_DATE - INTERVAL '1 day'
-            ) as source_has_failures,
-            EXISTS (
-                SELECT 1 FROM task_instance 
-                WHERE dag_id = dd.target_dag_id 
-                AND state = 'failed'
-                AND start_date >= CURRENT_DATE - INTERVAL '1 day'
-            ) as target_has_failures
-        FROM dag_deps dd
-        JOIN dag d1 ON dd.source_dag_id = d1.dag_id
-        JOIN dag d2 ON dd.target_dag_id = d2.dag_id
-        ORDER BY depth, source_dag_id;
-    """,
+    #         SELECT 
+    #             d.source_dag_id,
+    #             regexp_replace(ti.task_id, '^external_task_sensor_', '') as target_dag_id,
+    #             d.depth + 1
+    #         FROM dag_deps d
+    #         JOIN task_instance ti ON d.target_dag_id = ti.dag_id
+    #         WHERE d.depth < 3
+    #             AND ti.task_id LIKE 'external_task_sensor_%'
+    #     )
+    #     SELECT 
+    #         dd.source_dag_id,
+    #         dd.target_dag_id,
+    #         dd.depth,
+    #         d1.is_paused as source_paused,
+    #         d2.is_paused as target_paused,
+    #         EXISTS (
+    #             SELECT 1 FROM task_instance 
+    #             WHERE dag_id = dd.source_dag_id 
+    #             AND state = 'failed'
+    #             AND start_date >= CURRENT_DATE - INTERVAL '1 day'
+    #         ) as source_has_failures,
+    #         EXISTS (
+    #             SELECT 1 FROM task_instance 
+    #             WHERE dag_id = dd.target_dag_id 
+    #             AND state = 'failed'
+    #             AND start_date >= CURRENT_DATE - INTERVAL '1 day'
+    #         ) as target_has_failures
+    #     FROM dag_deps dd
+    #     JOIN dag d1 ON dd.source_dag_id = d1.dag_id
+    #     JOIN dag d2 ON dd.target_dag_id = d2.dag_id
+    #     ORDER BY depth, source_dag_id;
+    # """,
 
-    "sla_analysis": f"""
-        WITH sla_stats AS (
-            SELECT 
-                dag_id,
-                task_id,
-                COUNT(*) as total_misses,
-                MIN(timestamp) as first_miss,
-                MAX(timestamp) as latest_miss,
-                STRING_AGG(DISTINCT COALESCE(description, 'No description'), ' | ') as sla_descriptions
-            FROM sla_miss
-            WHERE timestamp >= CURRENT_DATE - INTERVAL '{LOOKBACK_DAYS} day'
-            GROUP BY dag_id, task_id
-        )
-        SELECT 
-            s.*,
-            EXTRACT(epoch FROM (latest_miss - first_miss)) / 3600 as hours_between_misses,
-            d.is_paused,
-            d.is_active,
-            CASE 
-                WHEN total_misses > 10 THEN 'CRITICAL'
-                WHEN total_misses > 5 THEN 'WARNING'
-                ELSE 'MONITOR'
-            END as status
-        FROM sla_stats s
-        JOIN dag d USING (dag_id)
-        WHERE total_misses > 1
-        ORDER BY total_misses DESC, latest_miss DESC
-        LIMIT 1000;
-    """,
+    # "sla_analysis": f"""
+    #     WITH sla_stats AS (
+    #         SELECT 
+    #             dag_id,
+    #             task_id,
+    #             COUNT(*) as total_misses,
+    #             MIN(timestamp) as first_miss,
+    #             MAX(timestamp) as latest_miss,
+    #             STRING_AGG(DISTINCT COALESCE(description, 'No description'), ' | ') as sla_descriptions
+    #         FROM sla_miss
+    #         WHERE timestamp >= CURRENT_DATE - INTERVAL '{LOOKBACK_DAYS} day'
+    #         GROUP BY dag_id, task_id
+    #     )
+    #     SELECT 
+    #         s.*,
+    #         EXTRACT(epoch FROM (latest_miss - first_miss)) / 3600 as hours_between_misses,
+    #         d.is_paused,
+    #         d.is_active,
+    #         CASE 
+    #             WHEN total_misses > 10 THEN 'CRITICAL'
+    #             WHEN total_misses > 5 THEN 'WARNING'
+    #             ELSE 'MONITOR'
+    #         END as status
+    #     FROM sla_stats s
+    #     JOIN dag d USING (dag_id)
+    #     WHERE total_misses > 1
+    #     ORDER BY total_misses DESC, latest_miss DESC
+    #     LIMIT 1000;
+    # """,
 
     "xcom_analysis": f"""
         WITH xcom_metrics AS (
@@ -444,16 +445,18 @@ Format your response in clear paragraphs, prioritizing critical findings first. 
     
     def create_task_group(self) -> List[models.BaseOperator]:
         """Creates and links all tasks in the group"""
-        export_task = self.create_export_task()
-        check_task = self.create_check_task()
-        report_task = self.create_report_task()
-        
-        export_task >> check_task >> report_task
-        
-        return [export_task, check_task, report_task]
+
+        with TaskGroup(group_id=self.metric_name) as export_group:
+            export_task = self.create_export_task()
+            check_task = self.create_check_task()
+            report_task = self.create_report_task()
+            
+            export_task >> check_task >> report_task
+            
+        return export_group
 
 with models.DAG(
-    f"optimized_gemini_insights_report_dag_v2",
+    f"airflow_db_insights_v1",
     tags=["airflow_db"],
     description="Export contents of airflow metadata DB to GCS location and analyze with Gemini.",
     is_paused_upon_creation=True,
@@ -477,18 +480,11 @@ with models.DAG(
         location=LOCATION,
         contents=[
             """
-You are a Google Cloud Composer and Airflow Metadata Database expert.
-
-Review the provided analysis of database queries covering: dag_runs, task_durations, scheduler_health, resource_pool_usage, database_metrics, zombie_tasks, dag_dependencies, sla analysis, and xcom analysis.
-
-Write a daily status report as plain text with clear paragraph breaks. Do not use any markdown, formatting characters, bullet points, or special symbols.
-
-Start your analysis with Resource Utilization by describing resource pool usage patterns and efficiency, CPU, memory, and database utilization trends, task duration and scheduling behavior, and database performance metrics.
-
+You are a Google Cloud Composer and Airflow Metadata Database expert. Review the provided analysis of database queries covering: dag_runs, task_durations, scheduler_health, resource_pool_usage, database_metrics, and xcom analysis.
+Write a daily status report as plain text with clear paragraph breaks. Do not use any markdown, formatting characters, bullets, or special symbols. Avoid making claims about specific numbers of available slots or resources unless explicitly provided in the analysis.
+Start your analysis with Resource Utilization by describing resource pool usage patterns and efficiency in general terms, CPU, memory, and database utilization trends, task duration and scheduling behavior, and database performance metrics.
 Continue with Workflow Health analysis by describing DAG and task instance execution status, scheduler health and performance indicators, SLA compliance and performance, presence and impact of zombie tasks, DAG dependency execution patterns, and XCom usage and efficiency.
-
-If you identify significant optimization opportunities, describe specific recommendations for Airflow configuration improvements, Composer infrastructure adjustments, cost optimization opportunities, and resource allocation refinements.
-
+If you identify significant optimization opportunities, list your recommendations numerically for Airflow configuration improvements, Composer infrastructure adjustments, cost optimization opportunities, and resource allocation refinements. Any recommended database operations must be performed through the Airflow REST API, Cloud Console, or Command Line Interface - never through direct database access. Format recommendations as: 1. First recommendation. 2. Second recommendation. 3. Third recommendation.
 Present your complete analysis in clear paragraphs with natural breaks between topics. Your response should be suitable for SRE and Data Engineering teams, covering both healthy operational metrics and areas needing attention. Include recommendations only when meaningful improvements are possible.
             """
         ] + [
@@ -497,9 +493,8 @@ Present your complete analysis in clear paragraphs with natural breaks between t
         ],
         pretrained_model=MODEL,
         trigger_rule="all_done",
-        dag=dag,
     )
     
     # Set dependencies for final report
     for task_group in task_groups.values():
-        task_group[-1] >> final_report  # Link each report task to final report
+        task_group >> final_report  # Link each report task to final report
