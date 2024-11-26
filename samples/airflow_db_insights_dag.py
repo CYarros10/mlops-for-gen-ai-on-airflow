@@ -8,10 +8,10 @@ from airflow.providers.google.cloud.operators.vertex_ai.generative_model import 
 
 # Configuration
 formatted_date = datetime.today().strftime("%Y_%m_%d")
-PROJECT_ID = "cy-artifacts"
+PROJECT_ID = "your-project"
 LOCATION = "us-central1"
 MODEL = "gemini-1.5-pro-002"
-BUCKET = "cy-genai"
+BUCKET = "your-bucket"
 GCS_OBJECT_PATH = f"composer-daily-reports/{formatted_date}"
 POSTGRES_CONNECTION_ID = "airflow_db"
 FILE_FORMAT = "csv"

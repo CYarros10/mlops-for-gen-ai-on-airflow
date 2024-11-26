@@ -6,7 +6,7 @@ import random
 import logging
 from datetime import datetime, timedelta
 from airflow import models, AirflowException
-from airflow.operators.python_operator import PythonOperator
+from airflow.operators.python import PythonOperator
 from airflow.providers.google.cloud.operators.vertex_ai.generative_model import (
     GenerativeModelGenerateContentOperator
 )
