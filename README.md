@@ -152,3 +152,5 @@ Going beyond. Use Airflow to compare many models by evaluating them all on the s
 Stay tuned for additional Vertex AI Operator support in Airflow. There are new model features released every day.
 
 Feel free to check out [samples/](samples/) for inspiration to integrate generative AI into your Airflow DAGs.
+
+Also look for inspiration in [Google's Generative AI Notebook samples](https://github.com/GoogleCloudPlatform/generative-ai).
