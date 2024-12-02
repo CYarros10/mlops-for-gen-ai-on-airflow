@@ -28,7 +28,7 @@ PRO_MODEL = "gemini-1.0-pro-002"
 # examples in a training dataset.
 # https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini-supervised-tuning-about
 TRAIN_DATA_BUCKET = "cloud-samples-data"
-TRAIN_DATA_PATH = "ai-platform/generative_ai/sft_train_data.jsonl"
+TRAIN_DATA_PATH = "ai-platform/generative_ai/gemini-1_5/text/sft_train_data.jsonl"
 
 # --------------------------------------------------------------------------------------------------
 # Begin DAG generation
